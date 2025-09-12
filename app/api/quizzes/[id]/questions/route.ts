@@ -107,20 +107,6 @@ export async function POST(
     });
     const nextOrder = (lastQuestion?.order || 0) + 1;
 
-    // Get or create a default category for quiz questions
-    let defaultCategory = await prisma.category.findFirst({
-      where: { name: "General" },
-    });
-
-    if (!defaultCategory) {
-      defaultCategory = await prisma.category.create({
-        data: {
-          name: "General",
-          description: "General quiz questions",
-        },
-      });
-    }
-
     // Create the question first
     const newQuestion = await prisma.question.create({
       data: {
@@ -132,7 +118,6 @@ export async function POST(
         correctAnswer: correctAnswer + 1, // Convert from 0-based to 1-based
         difficulty: difficulty.toUpperCase(),
         explanation: explanation || "",
-        categoryId: defaultCategory.id,
         createdById: adminUser!.id,
       },
     });
@@ -143,6 +128,7 @@ export async function POST(
         quizId,
         questionId: newQuestion.id,
         order: nextOrder,
+        points: 1,
       },
     });
 
