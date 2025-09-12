@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Container,
@@ -44,7 +44,7 @@ interface Question {
   quizId?: string;
 }
 
-export default function QuestionsPage() {
+function QuestionsPageContent() {
   const searchParams = useSearchParams();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]);
@@ -721,8 +721,12 @@ export default function QuestionsPage() {
               <Button
                 variant="light"
                 onClick={() => {
-                  const selectedQuiz = quizzes.find(q => q.id === selectedQuizId);
-                  const topic = selectedQuiz ? selectedQuiz.title : "General Knowledge";
+                  const selectedQuiz = quizzes.find(
+                    (q) => q.id === selectedQuizId
+                  );
+                  const topic = selectedQuiz
+                    ? selectedQuiz.title
+                    : "General Knowledge";
                   generateAIQuestion(topic);
                 }}
                 loading={aiGenerating}
@@ -1172,5 +1176,13 @@ export default function QuestionsPage() {
         )}
       </Modal>
     </Container>
+  );
+}
+
+export default function QuestionsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <QuestionsPageContent />
+    </Suspense>
   );
 }
