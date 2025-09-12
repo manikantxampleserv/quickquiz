@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
     if (includeCount) {
       total = await prisma.quiz.count({
         where: {
-          categoryId: categoryId || undefined,
           isPublic: isPublic ? isPublic === "true" : undefined,
         },
       });
@@ -30,11 +29,9 @@ export async function GET(request: NextRequest) {
       skip,
       take: limit,
       where: {
-        categoryId: categoryId || undefined,
         isPublic: isPublic ? isPublic === "true" : undefined,
       },
       include: {
-        category: true,
         createdBy: true,
         _count: {
           select: {
@@ -56,7 +53,6 @@ export async function GET(request: NextRequest) {
         description: quiz.description,
         timeLimit: quiz.timeLimit,
         isPublic: quiz.isPublic,
-        category: quiz.category?.name,
         _count: {
           questions: quiz._count.quizQuestions,
         },
@@ -64,7 +60,6 @@ export async function GET(request: NextRequest) {
         attemptCount: quiz._count.quizAttempts,
         createdAt: quiz.createdAt,
         createdBy: quiz.createdBy.name,
-        questions: [], // Will be loaded separately when expanded
       })),
       total: includeCount ? total : undefined,
       page,
@@ -123,7 +118,6 @@ export async function POST(request: NextRequest) {
             order: "asc",
           },
         },
-        category: true,
         createdBy: true,
         _count: {
           select: {
@@ -142,7 +136,6 @@ export async function POST(request: NextRequest) {
         description: newQuiz.description,
         timeLimit: newQuiz.timeLimit,
         isPublic: newQuiz.isPublic,
-        category: newQuiz.category?.name,
         questionCount: newQuiz._count.quizQuestions,
         attemptCount: newQuiz._count.quizAttempts,
         createdAt: newQuiz.createdAt,

@@ -227,6 +227,7 @@ export async function seedDatabase() {
                 quizId: targetQuiz.id,
                 questionId: newQuestion.id,
                 order: i + 1,
+                points: 1,
               },
             });
           }
@@ -243,4 +244,17 @@ export async function seedDatabase() {
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+// Run the seed function if this file is executed directly
+if (require.main === module) {
+  seedDatabase()
+    .then((result) => {
+      console.log(result);
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("Seeding failed:", error);
+      process.exit(1);
+    });
 }
