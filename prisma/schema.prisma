@@ -1,0 +1,145 @@
+// QuickQuiz Database Schema
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  createdQuizzes Quiz[]
+  quizAttempts   QuizAttempt[]
+  createdQuestions Question[]
+
+  @@map("users")
+}
+
+
+model Question {
+  id          String     @id @default(cuid())
+  question    String
+  option1     String
+  option2     String
+  option3     String
+  option4     String
+  correctAnswer Int
+  difficulty  Difficulty @default(MEDIUM)
+  explanation String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  
+  quizQuestions QuizQuestion[]
+  answers       Answer[]
+
+  @@map("questions")
+}
+
+model Quiz {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  timeLimit   Int      @default(30) // in minutes
+  isPublic    Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  
+  quizQuestions QuizQuestion[]
+  quizAttempts  QuizAttempt[]
+
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id       String @id @default(cuid())
+  order    Int
+  points   Int    @default(1)
+
+  // Relations
+  quizId     String
+  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, questionId])
+  @@unique([quizId, order])
+  @@map("quiz_questions")
+}
+
+model QuizAttempt {
+  id          String            @id @default(cuid())
+  score       Int               @default(0)
+  totalPoints Int
+  timeSpent   Int?              // in seconds
+  status      AttemptStatus     @default(IN_PROGRESS)
+  startedAt   DateTime          @default(now())
+  completedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  answers Answer[]
+
+  @@map("quiz_attempts")
+}
+
+model Answer {
+  id             String   @id @default(cuid())
+  selectedAnswer Int?     // null if not answered
+  isCorrect      Boolean?
+  timeSpent      Int?     // in seconds
+  createdAt      DateTime @default(now())
+
+  // Relations
+  attemptId  String
+  attempt    QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@map("answers")
+}
+
+// Enums
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
