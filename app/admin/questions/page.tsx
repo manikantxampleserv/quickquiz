@@ -42,6 +42,7 @@ interface Question {
   difficulty: string;
   explanation: string;
   quizId?: string;
+  title?: string;
 }
 
 function QuestionsPageContent() {
@@ -78,6 +79,8 @@ function QuestionsPageContent() {
     },
   });
 
+  console.log(questions);
+
   const quizSelectionForm = useForm({
     initialValues: {
       selectedQuiz: "",
@@ -104,7 +107,28 @@ function QuestionsPageContent() {
       const response = await fetch(url);
       const data = await response.json();
       if (data.success) {
-        setQuestions(data.questions || []);
+        const questionsWithQuizTitles = await Promise.all(
+          (data.questions || []).map(async (question: Question) => {
+            if (question.quizId && !selectedQuizId) {
+              try {
+                const quizResponse = await fetch(
+                  `/api/quizzes/${question.quizId}`
+                );
+                const quizData = await quizResponse.json();
+                if (quizData.success) {
+                  return { ...question, title: quizData.quiz.title };
+                }
+              } catch (error) {
+                console.error("Error fetching quiz title:", error);
+              }
+            } else if (selectedQuizId) {
+              const selectedQuiz = quizzes.find((q) => q.id === selectedQuizId);
+              return { ...question, title: selectedQuiz?.title };
+            }
+            return question;
+          })
+        );
+        setQuestions(questionsWithQuizTitles);
       }
     } catch (error) {
       console.error("Error fetching questions:", error);
@@ -561,31 +585,32 @@ function QuestionsPageContent() {
   };
 
   useEffect(() => {
-    // Check URL parameters for quiz filtering
-    const quizId = searchParams.get("quizId");
-    const quizTitle = searchParams.get("quizTitle");
-
-    if (quizId) {
-      setSelectedQuizId(quizId);
-    }
-    if (quizTitle) {
-      setSelectedQuizTitle(decodeURIComponent(quizTitle));
-    }
-
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchQuestions(), fetchQuizzes()]);
+      await fetchQuizzes();
+
+      // Check URL parameters for quiz filtering after quizzes are loaded
+      const quizId = searchParams.get("quizId");
+      const quizTitle = searchParams.get("quizTitle");
+
+      if (quizId) {
+        setSelectedQuizId(quizId);
+      }
+      if (quizTitle) {
+        setSelectedQuizTitle(decodeURIComponent(quizTitle));
+      }
+
       setLoading(false);
     };
     loadData();
   }, [searchParams]);
 
-  // Refetch questions when selectedQuizId changes
+  // Refetch questions when selectedQuizId changes or quizzes are loaded
   useEffect(() => {
-    if (selectedQuizId !== null) {
+    if (quizzes.length > 0) {
       fetchQuestions();
     }
-  }, [selectedQuizId]);
+  }, [selectedQuizId, quizzes]);
 
   return (
     <Container size="xl">
@@ -647,41 +672,53 @@ function QuestionsPageContent() {
           <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
             {questions.map((question: Question, index: number) => (
               <Card key={question.id || index} withBorder>
-                <Stack gap="xs">
-                  <Text fw={500} lineClamp={2}>
-                    {question.question}
-                  </Text>
-                  <Badge size="xs" data-theme-accent>
-                    {question.difficulty}
-                  </Badge>
-                  <Group justify="flex-end" gap="xs">
-                    <ActionIcon
-                      variant="light"
-                      size="sm"
-                      onClick={() => handlePreviewQuestion(question)}
-                      title="Preview Question"
-                    >
-                      <IconEye size="0.8rem" />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="light"
-                      size="sm"
-                      onClick={() => handleEditQuestion(question)}
-                      title="Edit Question"
-                    >
-                      <IconEdit size="0.8rem" />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="light"
-                      color="red"
-                      size="sm"
-                      onClick={() =>
-                        question.id && handleDeleteQuestion(question.id)
-                      }
-                      title="Delete Question"
-                    >
-                      <IconTrash size="0.8rem" />
-                    </ActionIcon>
+                <Stack gap="xs" justify="space-between">
+                  <Group>
+                    <Text fw={500} lineClamp={2}>
+                      {question.question}
+                    </Text>
+                    <Group justify="space-between" align="center">
+                      <Badge size="xs" data-theme-accent>
+                        {question.difficulty}
+                      </Badge>
+                    </Group>
+                  </Group>
+
+                  <Group justify="space-between" align="center">
+                    {question.title && (
+                      <Badge size="xs" variant="light" color="blue">
+                        {question.title}
+                      </Badge>
+                    )}
+                    <Group justify="flex-end" gap="xs">
+                      <ActionIcon
+                        variant="light"
+                        size="sm"
+                        onClick={() => handlePreviewQuestion(question)}
+                        title="Preview Question"
+                      >
+                        <IconEye size="0.8rem" />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="light"
+                        size="sm"
+                        onClick={() => handleEditQuestion(question)}
+                        title="Edit Question"
+                      >
+                        <IconEdit size="0.8rem" />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="light"
+                        color="red"
+                        size="sm"
+                        onClick={() =>
+                          question.id && handleDeleteQuestion(question.id)
+                        }
+                        title="Delete Question"
+                      >
+                        <IconTrash size="0.8rem" />
+                      </ActionIcon>
+                    </Group>
                   </Group>
                 </Stack>
               </Card>
@@ -705,37 +742,25 @@ function QuestionsPageContent() {
         size="lg"
       >
         <form onSubmit={questionForm.onSubmit(handleCreateQuestion)}>
-          <Stack gap="md">
-            <Group grow>
-              <Select
-                label="Select Quiz (Optional)"
-                placeholder="Choose a quiz for this question"
-                data={quizzes.map((quiz) => ({
-                  value: quiz.id,
-                  label: quiz.title,
-                }))}
-                value={selectedQuizId}
-                onChange={(value) => setSelectedQuizId(value)}
-                clearable
-              />
-              <Button
-                variant="light"
-                onClick={() => {
-                  const selectedQuiz = quizzes.find(
-                    (q) => q.id === selectedQuizId
-                  );
-                  const topic = selectedQuiz
-                    ? selectedQuiz.title
-                    : "General Knowledge";
-                  generateAIQuestion(topic);
-                }}
-                loading={aiGenerating}
-                leftSection={<IconRobot size="1rem" />}
-                mt="xl"
-              >
-                Generate Question with AI
-              </Button>
-            </Group>
+          <Stack gap="sm">
+            <Button
+              variant="light"
+              onClick={() => {
+                const selectedQuiz = quizzes.find(
+                  (q) => q.id === selectedQuizId
+                );
+                const topic = selectedQuiz
+                  ? selectedQuiz.title
+                  : "General Knowledge";
+                generateAIQuestion(topic);
+              }}
+              loading={aiGenerating}
+              leftSection={<IconRobot size="1rem" />}
+              mt="xl"
+            >
+              Generate Question with AI
+            </Button>
+
             <TextInput
               label="Question"
               placeholder="Enter your question"

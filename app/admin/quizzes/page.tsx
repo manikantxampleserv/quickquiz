@@ -468,18 +468,19 @@ export default function QuizzesPage() {
                       <Text fw={500} style={{ flex: 1 }}>
                         {quiz.title}
                       </Text>
-                      <Button
-                        variant="light"
-                        size="xs"
-                        leftSection={<IconEye size="0.8rem" />}
+
+                      <ActionIcon
+                        variant="subtle"
+                        size="sm"
                         onClick={() =>
                           (window.location.href = `/admin/questions?quizId=${
                             quiz.id
                           }&quizTitle=${encodeURIComponent(quiz.title)}`)
                         }
+                        title="View Quiz"
                       >
-                        View Details
-                      </Button>
+                        <IconEye size="1rem" />
+                      </ActionIcon>
                     </Group>
 
                     <Text size="sm" c="dimmed" lineClamp={2}>
