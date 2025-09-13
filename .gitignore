@@ -39,5 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+QuickQuiz-API.postman_collection.json
 
 /lib/generated/prisma
