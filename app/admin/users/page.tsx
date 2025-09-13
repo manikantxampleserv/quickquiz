@@ -34,7 +34,7 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch("/api/users");
+      const response = await fetch("/api/v1/users");
       const data = await response.json();
       setUsers(data.users || []);
     } catch (error) {

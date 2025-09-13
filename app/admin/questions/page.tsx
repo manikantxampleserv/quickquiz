@@ -1,37 +1,34 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
 import {
-  Container,
-  Title,
-  SimpleGrid,
-  Card,
-  Text,
+  ActionIcon,
   Badge,
-  Stack,
-  Group,
   Button,
+  Card,
+  Checkbox,
+  Group,
   Modal,
+  NumberInput,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
   TextInput,
   Textarea,
-  Select,
-  ActionIcon,
-  NumberInput,
-  Checkbox,
-  Breadcrumbs,
-  Anchor,
+  Title,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import {
-  IconPlus,
-  IconEdit,
-  IconTrash,
-  IconRobot,
   IconBulb,
+  IconEdit,
   IconEye,
+  IconPlus,
+  IconRobot,
+  IconTrash,
 } from "@tabler/icons-react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { QuestionsGridSkeleton } from "../components/SkeletonLoaders";
 
 interface Question {
@@ -43,9 +40,19 @@ interface Question {
   explanation: string;
   quizId?: string;
   title?: string;
+  quizzes?: Array<{
+    id: string;
+    title: string;
+  }>;
+  quizCount?: number;
+  createdBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
-function QuestionsPageContent() {
+const QuestionsPageContent = () => {
   const searchParams = useSearchParams();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]);
@@ -65,8 +72,8 @@ function QuestionsPageContent() {
   const [selectedQuestionForPreview, setSelectedQuestionForPreview] =
     useState<Question | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiGeneratingAnswer, setAiGeneratingAnswer] = useState(false);
-  const [aiGeneratingExplanation, setAiGeneratingExplanation] = useState(false);
+  const [aiGeneratingAnswerExplanation, setAiGeneratingAnswerExplanation] =
+    useState(false);
   const [loading, setLoading] = useState(true);
 
   const questionForm = useForm<Question>({
@@ -78,8 +85,6 @@ function QuestionsPageContent() {
       explanation: "",
     },
   });
-
-  console.log(questions);
 
   const quizSelectionForm = useForm({
     initialValues: {
@@ -99,9 +104,9 @@ function QuestionsPageContent() {
 
   const fetchQuestions = async () => {
     try {
-      let url = "/api/questions";
+      let url = "/api/v1/questions";
       if (selectedQuizId) {
-        url = `/api/quizzes/${selectedQuizId}/questions`;
+        url = `/api/v1/quizzes/${selectedQuizId}/questions`;
       }
 
       const response = await fetch(url);
@@ -112,7 +117,7 @@ function QuestionsPageContent() {
             if (question.quizId && !selectedQuizId) {
               try {
                 const quizResponse = await fetch(
-                  `/api/quizzes/${question.quizId}`
+                  `/api/v1/quizzes/${question.quizId}`
                 );
                 const quizData = await quizResponse.json();
                 if (quizData.success) {
@@ -141,7 +146,7 @@ function QuestionsPageContent() {
     if (!confirm("Are you sure you want to delete this question?")) return;
 
     try {
-      const response = await fetch(`/api/questions/${questionId}`, {
+      const response = await fetch(`/api/v1/questions/${questionId}`, {
         method: "DELETE",
       });
 
@@ -174,10 +179,14 @@ function QuestionsPageContent() {
   const handleEditQuestion = (question: Question) => {
     if (!question.id) return;
 
+    const cleanOptions = (question.options || []).map((option: string) => {
+      return option.replace(/^[A-D]\.\s*/, "");
+    });
+
     questionForm.setValues({
       ...question,
-      // Ensure options is always an array with at least 4 elements
-      options: [...(question.options || []), "", "", ""].slice(0, 4),
+      options: [...cleanOptions, "", "", ""].slice(0, 4),
+      correctAnswer: String(question.correctAnswer),
     });
     setSelectedQuizId(question.quizId || "");
     setQuestionModalOpened(true);
@@ -191,7 +200,9 @@ function QuestionsPageContent() {
   const handleCreateQuestion = async (values: Question) => {
     try {
       const isEdit = !!values.id;
-      const url = isEdit ? `/api/questions/${values.id}` : "/api/questions";
+      const url = isEdit
+        ? `/api/v1/questions/${values.id}`
+        : "/api/v1/questions";
 
       const response = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
@@ -237,7 +248,7 @@ function QuestionsPageContent() {
   const generateAIQuestion = async (topic: string) => {
     setAiGenerating(true);
     try {
-      const response = await fetch("/api/ai/generate-question", {
+      const response = await fetch("/api/v1/ai/generate-question", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -255,14 +266,12 @@ function QuestionsPageContent() {
           ? data.question.options
           : ["", "", "", ""];
 
-        // Find correct answer index by matching the correct answer text with options
         let correctAnswerIndex = 0;
 
         if (data.question.correctAnswer !== undefined) {
           if (typeof data.question.correctAnswer === "number") {
             correctAnswerIndex = data.question.correctAnswer;
           } else if (typeof data.question.correctAnswer === "string") {
-            // Try to find the option that matches the correct answer text
             const matchIndex = options.findIndex(
               (option: string) =>
                 option
@@ -314,11 +323,10 @@ function QuestionsPageContent() {
   const handleBulkGenerate = async (values: any) => {
     setAiGenerating(true);
     try {
-      // Find the selected quiz to get its title for context
       const selectedQuiz = quizzes.find((quiz) => quiz.id === values.quizId);
       const quizTitle = selectedQuiz?.title || "General Questions";
 
-      const response = await fetch("/api/ai/generate-question", {
+      const response = await fetch("/api/v1/ai/generate-question", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -357,12 +365,11 @@ function QuestionsPageContent() {
 
   const handleBulkSave = async (selectedIndices?: number[]) => {
     try {
-      // If selectedIndices is provided, filter the questions
       const questionsToSave = selectedIndices
         ? previewQuestions.filter((_, index) => selectedIndices.includes(index))
         : previewQuestions;
 
-      const response = await fetch("/api/questions/bulk", {
+      const response = await fetch("/api/v1/questions/bulk", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -404,7 +411,7 @@ function QuestionsPageContent() {
 
   const fetchQuizzes = async () => {
     try {
-      const response = await fetch("/api/quizzes");
+      const response = await fetch("/api/v1/quizzes");
       const data = await response.json();
       if (data.success) {
         setQuizzes(data.quizzes || []);
@@ -414,7 +421,9 @@ function QuestionsPageContent() {
     }
   };
 
-  const generateAIAnswer = async () => {
+  const generateAIAnswerAndExplanation = async (
+    mode: "answer" | "explanation" | "both" = "both"
+  ) => {
     if (!questionForm.values.question) {
       notifications.show({
         title: "Error",
@@ -424,114 +433,88 @@ function QuestionsPageContent() {
       return;
     }
 
-    setAiGeneratingAnswer(true);
+    setAiGeneratingAnswerExplanation(true);
+
     try {
-      const response = await fetch("/api/ai/generate-answer", {
+      const requestBody: any = {
+        question: questionForm.values.question,
+        options: questionForm.values.options.filter((opt) => opt.trim() !== ""),
+        mode,
+      };
+
+      // For explanation mode, we need the correct answer
+      if (mode === "explanation") {
+        requestBody.correctAnswer = parseInt(questionForm.values.correctAnswer);
+      }
+
+      const response = await fetch("/api/v1/ai/generate-answer-explanation", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          question: questionForm.values.question,
-          options: questionForm.values.options.filter(
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.correctAnswer !== undefined) {
+          // Ensure the correct answer index is valid (0-3) and within the available options
+          const correctAnswerIndex = parseInt(data.correctAnswer.toString());
+          const availableOptions = questionForm.values.options.filter(
             (opt) => opt.trim() !== ""
-          ),
-        }),
-      });
+          );
 
-      const data = await response.json();
+          if (
+            correctAnswerIndex >= 0 &&
+            correctAnswerIndex < availableOptions.length
+          ) {
+            questionForm.setFieldValue(
+              "correctAnswer",
+              correctAnswerIndex.toString()
+            );
+          }
+        }
 
-      if (data.success) {
-        const correctAnswerString = data.correctAnswer.toString();
-        questionForm.setFieldValue("correctAnswer", correctAnswerString);
-        console.log(
-          "Setting correct answer to:",
-          correctAnswerString,
-          "for options:",
-          questionForm.values.options
-        );
+        if (data.explanation) {
+          questionForm.setFieldValue("explanation", data.explanation);
+        }
+
+        let message = "";
+        if (mode === "both") {
+          message = "AI generated answer and explanation!";
+        } else if (mode === "answer") {
+          message = "AI generated correct answer!";
+        } else {
+          message = "AI generated explanation!";
+        }
+
         notifications.show({
           title: "Success",
-          message: "AI generated correct answer!",
+          message,
           color: "green",
         });
       } else {
         notifications.show({
           title: "Error",
-          message: "Failed to generate answer",
+          message: data.error || "Failed to generate AI content",
           color: "red",
         });
       }
     } catch (error) {
-      console.error("Error generating AI answer:", error);
+      console.error("Error generating AI content:", error);
       notifications.show({
         title: "Error",
-        message: "Failed to generate answer",
+        message: "Failed to generate AI content",
         color: "red",
       });
     } finally {
-      setAiGeneratingAnswer(false);
-    }
-  };
-
-  const generateAIExplanation = async () => {
-    if (
-      !questionForm.values.question ||
-      questionForm.values.options.filter((opt) => opt.trim() !== "").length < 2
-    ) {
-      notifications.show({
-        title: "Error",
-        message: "Please enter question and options first",
-        color: "red",
-      });
-      return;
-    }
-
-    setAiGeneratingExplanation(true);
-    try {
-      const response = await fetch("/api/ai/generate-explanation", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          question: questionForm.values.question,
-          options: questionForm.values.options,
-          correctAnswer: questionForm.values.correctAnswer,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        questionForm.setFieldValue("explanation", data.explanation);
-        notifications.show({
-          title: "Success",
-          message: "AI generated explanation!",
-          color: "green",
-        });
-      } else {
-        notifications.show({
-          title: "Error",
-          message: "Failed to generate explanation",
-          color: "red",
-        });
-      }
-    } catch (error) {
-      console.error("Error generating AI explanation:", error);
-      notifications.show({
-        title: "Error",
-        message: "Failed to generate explanation",
-        color: "red",
-      });
-    } finally {
-      setAiGeneratingExplanation(false);
+      setAiGeneratingAnswerExplanation(false);
     }
   };
 
   const handleQuizSelection = (values: any) => {
     if (values.createNew) {
-      // Create new quiz first, then proceed to question creation
       createNewQuiz(values.newQuizTitle, values.newQuizDescription);
     } else {
       setSelectedQuizId(values.selectedQuiz);
@@ -542,7 +525,7 @@ function QuestionsPageContent() {
 
   const createNewQuiz = async (title: string, description: string) => {
     try {
-      const response = await fetch("/api/quizzes", {
+      const response = await fetch("/api/v1/quizzes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -589,7 +572,6 @@ function QuestionsPageContent() {
       setLoading(true);
       await fetchQuizzes();
 
-      // Check URL parameters for quiz filtering after quizzes are loaded
       const quizId = searchParams.get("quizId");
       const quizTitle = searchParams.get("quizTitle");
 
@@ -605,7 +587,6 @@ function QuestionsPageContent() {
     loadData();
   }, [searchParams]);
 
-  // Refetch questions when selectedQuizId changes or quizzes are loaded
   useEffect(() => {
     if (quizzes.length > 0) {
       fetchQuestions();
@@ -613,17 +594,8 @@ function QuestionsPageContent() {
   }, [selectedQuizId, quizzes]);
 
   return (
-    <Container size="xl">
+    <>
       <Stack gap="lg">
-        {selectedQuizTitle && (
-          <Breadcrumbs>
-            <Anchor onClick={() => (window.location.href = "/admin/quizzes")}>
-              Quiz Management
-            </Anchor>
-            <Text>{selectedQuizTitle}</Text>
-          </Breadcrumbs>
-        )}
-
         <Group justify="space-between">
           <Title order={2}>
             {selectedQuizTitle
@@ -631,18 +603,6 @@ function QuestionsPageContent() {
               : "Question Bank"}
           </Title>
           <Group>
-            {selectedQuizTitle && (
-              <Button
-                variant="subtle"
-                onClick={() => {
-                  setSelectedQuizId(null);
-                  setSelectedQuizTitle("");
-                  window.history.pushState({}, "", "/admin/questions");
-                }}
-              >
-                View All Questions
-              </Button>
-            )}
             <Button
               leftSection={<IconBulb size="1rem" />}
               onClick={() => setBulkModalOpened(true)}
@@ -672,8 +632,8 @@ function QuestionsPageContent() {
           <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
             {questions.map((question: Question, index: number) => (
               <Card key={question.id || index} withBorder>
-                <Stack gap="xs" justify="space-between">
-                  <Group>
+                <Stack gap="xs" justify="space-between" mih={115}>
+                  <Stack>
                     <Text fw={500} lineClamp={2}>
                       {question.question}
                     </Text>
@@ -682,14 +642,40 @@ function QuestionsPageContent() {
                         {question.difficulty}
                       </Badge>
                     </Group>
-                  </Group>
+                  </Stack>
 
                   <Group justify="space-between" align="center">
-                    {question.title && (
-                      <Badge size="xs" variant="light" color="blue">
-                        {question.title}
-                      </Badge>
-                    )}
+                    <Group gap="xs">
+                      {!selectedQuizId &&
+                      question.quizzes &&
+                      question.quizzes.length > 0 ? (
+                        <Group gap="xs" wrap="wrap">
+                          {question.quizzes.slice(0, 2).map((quiz: any) => (
+                            <Badge
+                              key={quiz.id}
+                              size="xs"
+                              variant="light"
+                              color="blue"
+                            >
+                              {quiz.title}
+                            </Badge>
+                          ))}
+                          {question.quizzes.length > 2 && (
+                            <Badge size="xs" variant="light" color="gray">
+                              +{question.quizzes.length - 2} more
+                            </Badge>
+                          )}
+                        </Group>
+                      ) : question.title ? (
+                        <Badge size="xs" variant="light" color="blue">
+                          {question.title}
+                        </Badge>
+                      ) : !selectedQuizId ? (
+                        <Badge size="xs" variant="light" color="gray">
+                          No Quiz
+                        </Badge>
+                      ) : null}
+                    </Group>
                     <Group justify="flex-end" gap="xs">
                       <ActionIcon
                         variant="light"
@@ -723,14 +709,31 @@ function QuestionsPageContent() {
                 </Stack>
               </Card>
             ))}
-            {questions.length === 0 && !loading && (
-              <Card withBorder>
-                <Text c="dimmed" ta="center">
-                  No questions available. Create your first question!
-                </Text>
-              </Card>
-            )}
           </SimpleGrid>
+        )}
+        {questions.length === 0 && !loading && (
+          <Card withBorder p="xl" bg="gray.0">
+            <Stack align="center" gap="md">
+              <IconPlus size="3rem" color="gray" />
+              <Stack align="center" gap="xs">
+                <Text size="lg" fw={600} c="dimmed">
+                  Ready to create your first question?
+                </Text>
+                <Text size="sm" c="dimmed" ta="center" maw={400}>
+                  Build engaging questions with multiple choice answers, set
+                  difficulty levels, and add explanations. Get started by
+                  clicking the "Create Question" button above.
+                </Text>
+              </Stack>
+              <Button
+                leftSection={<IconPlus size="1rem" />}
+                onClick={() => setQuestionModalOpened(true)}
+                size="md"
+              >
+                Create Your First Question
+              </Button>
+            </Stack>
+          </Card>
         )}
       </Stack>
 
@@ -740,96 +743,111 @@ function QuestionsPageContent() {
         onClose={() => setQuestionModalOpened(false)}
         title={questionForm.values.id ? "Edit Question" : "Add New Question"}
         size="lg"
+        styles={{
+          header: {
+            borderBottom: "1px solid var(--mantine-color-gray-3)",
+          },
+          body: {
+            padding: "0 0 1rem 0",
+          },
+        }}
       >
         <form onSubmit={questionForm.onSubmit(handleCreateQuestion)}>
-          <Stack gap="sm">
-            <Button
-              variant="light"
-              onClick={() => {
-                const selectedQuiz = quizzes.find(
-                  (q) => q.id === selectedQuizId
-                );
-                const topic = selectedQuiz
-                  ? selectedQuiz.title
-                  : "General Knowledge";
-                generateAIQuestion(topic);
-              }}
-              loading={aiGenerating}
-              leftSection={<IconRobot size="1rem" />}
-              mt="xl"
-            >
-              Generate Question with AI
-            </Button>
+          <div
+            style={{
+              maxHeight: "60vh",
+              overflowY: "auto",
+              padding: "24px",
+            }}
+          >
+            <Stack gap="md">
+              <Button
+                variant="light"
+                onClick={() => {
+                  const selectedQuiz = quizzes.find(
+                    (q) => q.id === selectedQuizId
+                  );
+                  const topic = selectedQuiz
+                    ? selectedQuiz.title
+                    : "General Knowledge";
+                  generateAIQuestion(topic);
+                }}
+                loading={aiGenerating}
+                leftSection={<IconRobot size="1rem" />}
+              >
+                Generate Question with AI
+              </Button>
 
-            <TextInput
-              label="Question"
-              placeholder="Enter your question"
-              {...questionForm.getInputProps("question")}
-              required
-            />
+              <Textarea
+                rows={3}
+                label="Question"
+                placeholder="Enter your question"
+                {...questionForm.getInputProps("question")}
+                required
+              />
 
-            <Text size="sm" fw={500}>
-              Options
-            </Text>
-            {(questionForm.values.options || ["", "", "", ""]).map(
-              (option: string, index: number) => (
-                <TextInput
-                  key={index}
-                  placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                  {...questionForm.getInputProps(`options.${index}`)}
-                  required
-                />
-              )
-            )}
-
-            <Select
-              label="Difficulty"
-              data={[
-                { value: "easy", label: "Easy" },
-                { value: "medium", label: "Medium" },
-                { value: "hard", label: "Hard" },
-              ]}
-              {...questionForm.getInputProps("difficulty")}
-              required
-            />
-
-            <Button
-              variant="light"
-              onClick={async () => {
-                try {
-                  await generateAIAnswer();
-                  await generateAIExplanation();
-                } catch (error) {
-                  console.error("Error in AI Answer & Explanation:", error);
-                }
-              }}
-              loading={aiGeneratingAnswer || aiGeneratingExplanation}
-              leftSection={<IconRobot size="1rem" />}
-              mt="sm"
-            >
-              AI Answer & Explanation
-            </Button>
-            <Select
-              label="Correct Answer"
-              data={questionForm.values.options.map(
-                (option: string, index: number) => ({
-                  value: index.toString(),
-                  label: `${String.fromCharCode(65 + index)}: ${
-                    option || `Option ${index + 1}`
-                  }`,
-                })
+              <Text size="sm" fw={500}>
+                Options
+              </Text>
+              {(questionForm.values.options || ["", "", "", ""]).map(
+                (option: string, index: number) => (
+                  <div key={index}>
+                    <TextInput
+                      placeholder={`Option ${String.fromCharCode(65 + index)}`}
+                      {...questionForm.getInputProps(`options.${index}`)}
+                      required
+                    />
+                  </div>
+                )
               )}
-              {...questionForm.getInputProps("correctAnswer")}
-              required
-            />
 
-            <Textarea
-              label="Explanation"
-              placeholder="Explain why this answer is correct"
-              {...questionForm.getInputProps("explanation")}
-              minRows={5}
-            />
+              <Select
+                label="Difficulty"
+                data={[
+                  { value: "easy", label: "Easy" },
+                  { value: "medium", label: "Medium" },
+                  { value: "hard", label: "Hard" },
+                ]}
+                {...questionForm.getInputProps("difficulty")}
+                required
+              />
 
+              <Button
+                variant="light"
+                onClick={() => generateAIAnswerAndExplanation("both")}
+                loading={aiGeneratingAnswerExplanation}
+                leftSection={<IconRobot size="1rem" />}
+              >
+                AI Answer & Explanation
+              </Button>
+
+              <Select
+                label="Correct Answer"
+                data={questionForm.values.options
+                  .filter((option: string) => option.trim() !== "")
+                  .map((option: string, index: number) => ({
+                    value: index.toString(),
+                    label: `${String.fromCharCode(65 + index)}) ${option}`,
+                  }))}
+                {...questionForm.getInputProps("correctAnswer")}
+                required
+              />
+
+              <Textarea
+                label="Explanation"
+                placeholder="Explain why this answer is correct"
+                {...questionForm.getInputProps("explanation")}
+                rows={3}
+              />
+            </Stack>
+          </div>
+
+          <div
+            style={{
+              borderTop: "1px solid var(--mantine-color-gray-3)",
+              padding: "1rem 24px 0 24px",
+            }}
+          >
             <Group justify="flex-end">
               <Button
                 variant="subtle"
@@ -839,7 +857,7 @@ function QuestionsPageContent() {
               </Button>
               <Button type="submit">Save Question</Button>
             </Group>
-          </Stack>
+          </div>
         </form>
       </Modal>
 
@@ -849,30 +867,53 @@ function QuestionsPageContent() {
         onClose={() => setBulkModalOpened(false)}
         title="Bulk Question Generation"
         size="md"
+        styles={{
+          header: {
+            borderBottom: "1px solid var(--mantine-color-gray-3)",
+          },
+          body: {
+            padding: "0 0 1rem 0",
+          },
+        }}
       >
         <form onSubmit={bulkForm.onSubmit(handleBulkGenerate)}>
-          <Stack gap="md">
-            <Select
-              label="Select Quiz"
-              description="Choose a quiz to generate questions for"
-              placeholder="Select a quiz category"
-              data={quizzes.map((quiz) => ({
-                value: quiz.id,
-                label: quiz.title,
-              }))}
-              {...bulkForm.getInputProps("quizId")}
-              required
-            />
+          <div
+            style={{
+              maxHeight: "60vh",
+              overflowY: "auto",
+              padding: "24px",
+            }}
+          >
+            <Stack gap="md">
+              <Select
+                label="Select Quiz"
+                description="Choose a quiz to generate questions for"
+                placeholder="Select a quiz category"
+                data={quizzes.map((quiz) => ({
+                  value: quiz.id,
+                  label: quiz.title,
+                }))}
+                {...bulkForm.getInputProps("quizId")}
+                required
+              />
 
-            <NumberInput
-              label="Number of Questions"
-              description="How many questions to generate (1-50)"
-              min={1}
-              max={50}
-              {...bulkForm.getInputProps("count")}
-              required
-            />
+              <NumberInput
+                label="Number of Questions"
+                description="How many questions to generate (1-50)"
+                min={1}
+                max={50}
+                {...bulkForm.getInputProps("count")}
+                required
+              />
+            </Stack>
+          </div>
 
+          <div
+            style={{
+              borderTop: "1px solid var(--mantine-color-gray-3)",
+              padding: "1rem 24px 0 24px",
+            }}
+          >
             <Group justify="flex-end">
               <Button
                 variant="subtle"
@@ -884,7 +925,7 @@ function QuestionsPageContent() {
                 Generate Questions
               </Button>
             </Group>
-          </Stack>
+          </div>
         </form>
       </Modal>
 
@@ -897,102 +938,151 @@ function QuestionsPageContent() {
         }}
         title="Preview Generated Questions"
         size="xl"
+        styles={{
+          header: {
+            borderBottom: "1px solid var(--mantine-color-gray-3)",
+          },
+          body: {
+            padding: "0 0 1rem 0",
+          },
+        }}
       >
-        <Stack gap="md">
-          <Group justify="space-between" align="center">
-            <Text size="sm" c="dimmed">
-              Review the generated questions before adding them to your question
-              bank.
-            </Text>
-            <Button
-              size="xs"
-              variant="light"
-              onClick={() => {
-                if (selectedQuestions.size === previewQuestions.length) {
-                  setSelectedQuestions(new Set());
-                } else {
-                  setSelectedQuestions(
-                    new Set(previewQuestions.map((_, i) => i))
-                  );
-                }
-              }}
-            >
-              {selectedQuestions.size === previewQuestions.length
-                ? "Deselect All"
-                : "Select All"}
-            </Button>
-          </Group>
+        <div
+          style={{
+            maxHeight: "70vh",
+            overflowY: "auto",
+            padding: "24px",
+          }}
+        >
+          <Stack gap="md">
+            <Group justify="space-between" align="center">
+              <Text size="sm" c="dimmed">
+                Review the generated questions before adding them to your
+                question bank.
+              </Text>
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => {
+                  if (selectedQuestions.size === previewQuestions.length) {
+                    setSelectedQuestions(new Set());
+                  } else {
+                    setSelectedQuestions(
+                      new Set(previewQuestions.map((_, i) => i))
+                    );
+                  }
+                }}
+              >
+                {selectedQuestions.size === previewQuestions.length
+                  ? "Deselect All"
+                  : "Select All"}
+              </Button>
+            </Group>
 
-          <Stack gap="lg" mah={500} style={{ overflow: "auto" }}>
-            {previewQuestions.map((question: Question, index: number) => (
-              <Card key={index} withBorder p="md">
-                <Group align="flex-start" gap="md">
-                  <Checkbox
-                    checked={selectedQuestions.has(index)}
-                    onChange={(event) => {
-                      const newSelected = new Set(selectedQuestions);
-                      if (event.currentTarget.checked) {
-                        newSelected.add(index);
-                      } else {
-                        newSelected.delete(index);
-                      }
-                      setSelectedQuestions(newSelected);
-                    }}
-                    mt={4}
-                  />
-                  <Stack gap="xs" style={{ flex: 1 }}>
-                    <Text
-                      fw={500}
-                      style={{
-                        wordBreak: "break-word",
-                        whiteSpace: "pre-wrap",
+            <Stack gap="lg">
+              {previewQuestions.map((question: Question, index: number) => (
+                <Card key={index} withBorder p="md">
+                  <Group align="flex-start" gap="md">
+                    <Checkbox
+                      checked={selectedQuestions.has(index)}
+                      onChange={(event) => {
+                        const newSelected = new Set(selectedQuestions);
+                        if (event.currentTarget.checked) {
+                          newSelected.add(index);
+                        } else {
+                          newSelected.delete(index);
+                        }
+                        setSelectedQuestions(newSelected);
                       }}
-                    >
-                      {index + 1}. {question.question}
-                    </Text>
-                    {question.options.map(
-                      (option: string, optIndex: number) => (
-                        <Text
-                          key={optIndex}
-                          size="sm"
-                          c={
-                            optIndex === parseInt(question.correctAnswer)
-                              ? "green"
-                              : "dimmed"
-                          }
-                          fw={
-                            optIndex === parseInt(question.correctAnswer)
-                              ? 500
-                              : 400
-                          }
-                          style={{
-                            wordBreak: "break-word",
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          {String.fromCharCode(65 + optIndex)}) {option}
-                        </Text>
-                      )
-                    )}
-                    {question.explanation && (
+                      mt={4}
+                    />
+                    <Stack gap="md" style={{ flex: 1 }}>
                       <Text
-                        size="xs"
-                        c="blue"
-                        fs="italic"
+                        fw={500}
+                        size="md"
                         style={{
                           wordBreak: "break-word",
                           whiteSpace: "pre-wrap",
+                          lineHeight: 1.5,
                         }}
                       >
-                        Explanation: {question.explanation}
+                        {index + 1}. {question.question}
                       </Text>
-                    )}
-                  </Stack>
-                </Group>
-              </Card>
-            ))}
-          </Stack>
 
+                      <Stack gap="xs">
+                        <Text size="sm" fw={500} c="dimmed">
+                          Options:
+                        </Text>
+                        {question.options.map(
+                          (option: string, optIndex: number) => (
+                            <Text
+                              key={optIndex}
+                              size="sm"
+                              c={
+                                optIndex === parseInt(question.correctAnswer)
+                                  ? "green"
+                                  : "dark"
+                              }
+                              fw={
+                                optIndex === parseInt(question.correctAnswer)
+                                  ? 600
+                                  : 400
+                              }
+                              style={{
+                                wordBreak: "break-word",
+                                whiteSpace: "pre-wrap",
+                                lineHeight: 1.4,
+                                padding: "4px 8px",
+                                backgroundColor:
+                                  optIndex === parseInt(question.correctAnswer)
+                                    ? "var(--mantine-color-green-0)"
+                                    : "transparent",
+                                borderRadius: "4px",
+                              }}
+                            >
+                              {String.fromCharCode(65 + optIndex)}) {option}
+                            </Text>
+                          )
+                        )}
+                      </Stack>
+
+                      {question.explanation && (
+                        <Stack gap="xs">
+                          <Text size="sm" fw={500} c="dimmed">
+                            Explanation:
+                          </Text>
+                          <Text
+                            size="sm"
+                            c="blue"
+                            style={{
+                              wordBreak: "break-word",
+                              whiteSpace: "pre-wrap",
+                              lineHeight: 1.4,
+                              fontStyle: "italic",
+                              padding: "8px 12px",
+                              backgroundColor: "var(--mantine-color-blue-0)",
+                              borderRadius: "4px",
+                              border: "1px solid var(--mantine-color-blue-2)",
+                            }}
+                          >
+                            {question.explanation}
+                          </Text>
+                        </Stack>
+                      )}
+                    </Stack>
+                  </Group>
+                </Card>
+              ))}
+            </Stack>
+          </Stack>
+        </div>
+
+        <div
+          style={{
+            borderTop: "1px solid var(--mantine-color-gray-3)",
+            padding: "1rem 24px 0 24px",
+          }}
+        >
           <Group justify="space-between">
             <Text size="sm" fw={500}>
               Total: {previewQuestions.length} questions | Selected:{" "}
@@ -1017,7 +1107,7 @@ function QuestionsPageContent() {
               </Button>
             </Group>
           </Group>
-        </Stack>
+        </div>
       </Modal>
 
       {/* Quiz Selection Modal */}
@@ -1026,48 +1116,71 @@ function QuestionsPageContent() {
         onClose={() => setQuizSelectionModalOpened(false)}
         title="Select Quiz Category"
         size="md"
+        styles={{
+          header: {
+            borderBottom: "1px solid var(--mantine-color-gray-3)",
+          },
+          body: {
+            padding: "0 0 1rem 0",
+          },
+        }}
       >
         <form onSubmit={quizSelectionForm.onSubmit(handleQuizSelection)}>
-          <Stack gap="md">
-            <Text size="sm" c="dimmed">
-              Questions are organized by quiz categories. Select an existing
-              quiz or create a new one.
-            </Text>
+          <div
+            style={{
+              maxHeight: "60vh",
+              overflowY: "auto",
+              padding: "24px",
+            }}
+          >
+            <Stack gap="md">
+              <Text size="sm" c="dimmed">
+                Questions are organized by quiz categories. Select an existing
+                quiz or create a new one.
+              </Text>
 
-            <Checkbox
-              label="Create new quiz category"
-              {...quizSelectionForm.getInputProps("createNew", {
-                type: "checkbox",
-              })}
-            />
-
-            {!quizSelectionForm.values.createNew ? (
-              <Select
-                label="Select Quiz"
-                placeholder="Choose a quiz category"
-                data={quizzes.map((quiz) => ({
-                  value: quiz.id,
-                  label: quiz.title,
-                }))}
-                {...quizSelectionForm.getInputProps("selectedQuiz")}
-                required={!quizSelectionForm.values.createNew}
+              <Checkbox
+                label="Create new quiz category"
+                {...quizSelectionForm.getInputProps("createNew", {
+                  type: "checkbox",
+                })}
               />
-            ) : (
-              <Stack gap="md">
-                <TextInput
-                  label="Quiz Title"
-                  placeholder="Enter quiz category name"
-                  {...quizSelectionForm.getInputProps("newQuizTitle")}
-                  required={quizSelectionForm.values.createNew}
-                />
-                <Textarea
-                  label="Quiz Description"
-                  placeholder="Enter quiz description"
-                  {...quizSelectionForm.getInputProps("newQuizDescription")}
-                />
-              </Stack>
-            )}
 
+              {!quizSelectionForm.values.createNew ? (
+                <Select
+                  label="Select Quiz"
+                  placeholder="Choose a quiz category"
+                  data={quizzes.map((quiz) => ({
+                    value: quiz.id,
+                    label: quiz.title,
+                  }))}
+                  {...quizSelectionForm.getInputProps("selectedQuiz")}
+                  required={!quizSelectionForm.values.createNew}
+                />
+              ) : (
+                <Stack gap="md">
+                  <TextInput
+                    label="Quiz Title"
+                    placeholder="Enter quiz category name"
+                    {...quizSelectionForm.getInputProps("newQuizTitle")}
+                    required={quizSelectionForm.values.createNew}
+                  />
+                  <Textarea
+                    label="Quiz Description"
+                    placeholder="Enter quiz description"
+                    {...quizSelectionForm.getInputProps("newQuizDescription")}
+                  />
+                </Stack>
+              )}
+            </Stack>
+          </div>
+
+          <div
+            style={{
+              borderTop: "1px solid var(--mantine-color-gray-3)",
+              padding: "1rem 24px 0 24px",
+            }}
+          >
             <Group justify="flex-end">
               <Button
                 variant="subtle"
@@ -1077,7 +1190,7 @@ function QuestionsPageContent() {
               </Button>
               <Button type="submit">Continue</Button>
             </Group>
-          </Stack>
+          </div>
         </form>
       </Modal>
 
@@ -1087,127 +1200,176 @@ function QuestionsPageContent() {
         onClose={() => setQuestionDetailModalOpened(false)}
         title="Question Details"
         size="lg"
+        styles={{
+          header: {
+            borderBottom: "1px solid var(--mantine-color-gray-3)",
+          },
+          body: {
+            padding: "0 0 1rem 0",
+          },
+        }}
       >
         {selectedQuestionForPreview && (
-          <Stack gap="md">
-            <div>
-              <Text size="sm" c="dimmed" mb="xs">
-                Question
-              </Text>
-              <Text fw={500} size="md">
-                {selectedQuestionForPreview.question}
-              </Text>
-            </div>
+          <>
+            <div
+              style={{
+                maxHeight: "60vh",
+                overflowY: "auto",
+                padding: "24px",
+              }}
+            >
+              <Stack gap="md">
+                <div>
+                  <Text size="sm" c="dimmed" mb="xs">
+                    Question
+                  </Text>
+                  <Text
+                    fw={500}
+                    size="md"
+                    style={{
+                      wordBreak: "break-word",
+                      whiteSpace: "pre-wrap",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {selectedQuestionForPreview.question}
+                  </Text>
+                </div>
 
-            <div>
-              <Text size="sm" c="dimmed" mb="xs">
-                Options
-              </Text>
-              <Stack gap="sm">
-                {selectedQuestionForPreview.options
-                  ?.filter((option) => option && option.trim() !== "")
-                  .map((option: string, index: number) => (
-                    <Card
-                      key={index}
-                      withBorder
-                      padding="md"
-                      style={{
-                        backgroundColor:
-                          index ===
-                          parseInt(selectedQuestionForPreview.correctAnswer)
-                            ? "var(--mantine-color-green-light)"
-                            : undefined,
-                        borderColor:
-                          index ===
-                          parseInt(selectedQuestionForPreview.correctAnswer)
-                            ? "var(--mantine-color-green-6)"
-                            : undefined,
-                        borderWidth:
-                          index ===
-                          parseInt(selectedQuestionForPreview.correctAnswer)
-                            ? 2
-                            : 1,
-                      }}
-                    >
-                      <Group justify="space-between" align="center">
-                        <Text
-                          size="sm"
-                          fw={
-                            index ===
-                            parseInt(selectedQuestionForPreview.correctAnswer)
-                              ? 600
-                              : 400
-                          }
-                          style={{ flex: 1 }}
+                <div>
+                  <Text size="sm" c="dimmed" mb="xs">
+                    Options
+                  </Text>
+                  <Stack gap="sm">
+                    {selectedQuestionForPreview.options
+                      ?.filter((option) => option && option.trim() !== "")
+                      .map((option: string, index: number) => (
+                        <Card
+                          key={index}
+                          withBorder
+                          padding="md"
+                          style={{
+                            backgroundColor:
+                              index ===
+                              parseInt(selectedQuestionForPreview.correctAnswer)
+                                ? "var(--mantine-color-green-0)"
+                                : undefined,
+                            borderColor:
+                              index ===
+                              parseInt(selectedQuestionForPreview.correctAnswer)
+                                ? "var(--mantine-color-green-6)"
+                                : undefined,
+                            borderWidth:
+                              index ===
+                              parseInt(selectedQuestionForPreview.correctAnswer)
+                                ? 2
+                                : 1,
+                          }}
                         >
-                          {String.fromCharCode(65 + index)}) {option}
-                        </Text>
-                        {index ===
-                          parseInt(
-                            selectedQuestionForPreview.correctAnswer
-                          ) && (
-                          <Badge size="sm" color="green" variant="filled">
-                            ✓ Correct Answer
-                          </Badge>
-                        )}
-                      </Group>
+                          <Group justify="space-between" align="center">
+                            <Text
+                              size="sm"
+                              fw={
+                                index ===
+                                parseInt(
+                                  selectedQuestionForPreview.correctAnswer
+                                )
+                                  ? 600
+                                  : 400
+                              }
+                              style={{
+                                flex: 1,
+                                wordBreak: "break-word",
+                                whiteSpace: "pre-wrap",
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              {String.fromCharCode(65 + index)}) {option}
+                            </Text>
+                            {index ===
+                              parseInt(
+                                selectedQuestionForPreview.correctAnswer
+                              ) && (
+                              <Badge size="sm" color="green" variant="filled">
+                                ✓ Correct Answer
+                              </Badge>
+                            )}
+                          </Group>
+                        </Card>
+                      ))}
+                  </Stack>
+                </div>
+
+                <Group>
+                  <div>
+                    <Text size="sm" c="dimmed">
+                      Difficulty
+                    </Text>
+                    <Badge data-theme-accent size="sm">
+                      {selectedQuestionForPreview.difficulty}
+                    </Badge>
+                  </div>
+                </Group>
+
+                {selectedQuestionForPreview.explanation && (
+                  <div>
+                    <Text size="sm" c="dimmed" mb="xs">
+                      Explanation
+                    </Text>
+                    <Card withBorder padding="md">
+                      <Text
+                        size="sm"
+                        style={{
+                          wordBreak: "break-word",
+                          whiteSpace: "pre-wrap",
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {selectedQuestionForPreview.explanation}
+                      </Text>
                     </Card>
-                  ))}
+                  </div>
+                )}
               </Stack>
             </div>
 
-            <Group>
-              <div>
-                <Text size="sm" c="dimmed">
-                  Difficulty
-                </Text>
-                <Badge data-theme-accent size="sm">
-                  {selectedQuestionForPreview.difficulty}
-                </Badge>
-              </div>
-            </Group>
-
-            {selectedQuestionForPreview.explanation && (
-              <div>
-                <Text size="sm" c="dimmed" mb="xs">
-                  Explanation
-                </Text>
-                <Card withBorder padding="md">
-                  <Text size="sm">
-                    {selectedQuestionForPreview.explanation}
-                  </Text>
-                </Card>
-              </div>
-            )}
-
-            <Group justify="flex-end" mt="md">
-              <Button
-                variant="subtle"
-                onClick={() => setQuestionDetailModalOpened(false)}
-              >
-                Close
-              </Button>
-              <Button
-                onClick={() => {
-                  setQuestionDetailModalOpened(false);
-                  handleEditQuestion(selectedQuestionForPreview);
-                }}
-                leftSection={<IconEdit size="1rem" />}
-              >
-                Edit Question
-              </Button>
-            </Group>
-          </Stack>
+            <div
+              style={{
+                borderTop: "1px solid var(--mantine-color-gray-3)",
+                padding: "1rem 24px 0 24px",
+              }}
+            >
+              <Group justify="flex-end">
+                <Button
+                  variant="subtle"
+                  onClick={() => setQuestionDetailModalOpened(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setQuestionDetailModalOpened(false);
+                    handleEditQuestion(selectedQuestionForPreview);
+                  }}
+                  leftSection={<IconEdit size="1rem" />}
+                >
+                  Edit Question
+                </Button>
+              </Group>
+            </div>
+          </>
         )}
       </Modal>
-    </Container>
+    </>
   );
-}
+};
 
-export default function QuestionsPage() {
+const QuestionsPage = () => {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <QuestionsPageContent />
     </Suspense>
   );
-}
+};
+
+export default QuestionsPage;

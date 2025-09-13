@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { questionService } from "@/lib/services/database";
 import { seedDatabase } from "@/lib/seed";
+import { ActivityService } from "@/lib/services/activity";
+import { ActivityType } from "@/lib/generated/prisma";
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,6 +27,17 @@ export async function GET(request: NextRequest) {
         difficulty: q.difficulty.toLowerCase(),
         explanation: q.explanation,
         createdAt: q.createdAt,
+        quizCount: q._count?.quizQuestions || 0, // Number of quizzes using this question
+        quizzes:
+          q.quizQuestions?.map((qq) => ({
+            id: qq.quiz.id,
+            title: qq.quiz.title,
+          })) || [],
+        createdBy: {
+          id: q.createdBy.id,
+          name: q.createdBy.name,
+          email: q.createdBy.email,
+        },
       })),
     });
   } catch (error) {
@@ -80,15 +93,26 @@ export async function POST(request: NextRequest) {
       option2: options[1],
       option3: options[2],
       option4: options[3],
-      correctAnswer: correctAnswer + 1, // Convert to 1-based index for database
+      correctAnswer: parseInt(correctAnswer) + 1, // Convert to 1-based index for database
       difficulty: difficulty.toUpperCase() as "EASY" | "MEDIUM" | "HARD",
       explanation,
       createdById: adminUser!.id,
     });
 
-    // Link question to quiz if quizId is provided
+    await ActivityService.logActivity(
+      adminUser!.id,
+      ActivityType.QUESTION_CREATED,
+      `Created new question: "${question.substring(0, 50)}${
+        question.length > 50 ? "..." : ""
+      }"`,
+      {
+        questionId: newQuestion.id,
+        difficulty: difficulty.toUpperCase(),
+        quizId,
+      }
+    );
+
     if (quizId) {
-      // Get the current question count for this quiz to set the order
       const existingQuestions = await prisma.quizQuestion.findMany({
         where: { quizId },
         orderBy: { order: "desc" },

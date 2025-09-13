@@ -1,5 +1,7 @@
 import { seedDatabase } from "@/lib/seed";
 import { NextRequest, NextResponse } from "next/server";
+import { ActivityService } from "@/lib/services/activity";
+import { ActivityType } from "@/lib/generated/prisma";
 
 export async function GET(request: NextRequest) {
   try {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { geminiModel } from "@/lib/gemini";
 
-// Helper function to generate question prompts
 function getQuestionPrompt(
   topic: string,
   difficulty: string,
@@ -55,7 +54,6 @@ IMPORTANT: Mix up the correctAnswer values (0, 1, 2, 3) across different questio
   }
 }
 
-// Helper function to generate bulk question prompts
 function getBulkPrompt(promptType: string, count: number): string {
   const prompts = {
     aptitude_placement: `Generate ${count} Aptitude and Reasoning questions for placement practice. Include:
@@ -115,19 +113,15 @@ export async function POST(request: NextRequest) {
     let prompt = "";
 
     if (bulkPrompt) {
-      // Handle preset bulk prompts
       prompt = getBulkPrompt(bulkPrompt, count);
     } else {
-      // Question generation (single or multiple)
       prompt = getQuestionPrompt(topic, difficulty, count);
     }
 
     try {
-      // Use Gemini model directly for content generation
       const result = await geminiModel.generateContent(prompt);
       const response = result.response.text();
 
-      // Clean the response to extract JSON from markdown formatting
       const cleanedResponse = response
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
@@ -137,13 +131,11 @@ export async function POST(request: NextRequest) {
 
       if (generatedContent && typeof generatedContent === "object") {
         if (count > 1 || bulkPrompt) {
-          // Return array of questions for bulk generation
           return NextResponse.json({
             success: true,
             questions: generatedContent.questions || [generatedContent],
           });
         } else {
-          // Return single question
           return NextResponse.json({
             success: true,
             question: generatedContent,

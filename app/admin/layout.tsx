@@ -1,28 +1,25 @@
 "use client";
 
-import { useState } from "react";
 import {
+  ActionIcon,
   AppShell,
+  Burger,
   Button,
   Group,
   Stack,
-  Title,
-  ActionIcon,
-  Burger,
   Text,
+  Title,
   useMantineColorScheme,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
-  IconDashboard,
-  IconUsers,
-  IconChartBar,
   IconBrain,
-  IconQuestionMark,
-  IconSun,
+  IconChartBar,
+  IconDashboard,
   IconMoon,
-  IconSettings,
   IconPalette,
+  IconSettings,
+  IconSun,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -41,14 +38,8 @@ export default function AdminLayout({
 
   const navigation = [
     { href: "/admin/dashboard", label: "Dashboard", icon: IconDashboard },
-    {
-      href: "/admin/questions",
-      label: "Question Bank",
-      icon: IconQuestionMark,
-    },
     { href: "/admin/quizzes", label: "Quiz Management", icon: IconBrain },
     { href: "/admin/analytics", label: "Analytics", icon: IconChartBar },
-    // { href: "/admin/users", label: "User Management", icon: IconUsers },
     { href: "/admin/settings", label: "Settings", icon: IconSettings },
   ];
 
@@ -67,11 +58,11 @@ export default function AdminLayout({
               hiddenFrom="sm"
               size="sm"
             />
-            <Title order={3}>
+            <Title order={2}>
               <Text
                 span
                 inherit
-                className="!text-3xl font-bold"
+                className="!text-4xl font-bold"
                 data-theme-accent
               >
                 Q
@@ -80,7 +71,7 @@ export default function AdminLayout({
               <Text
                 span
                 inherit
-                className="!text-3xl font-bold"
+                className="!text-4xl font-bold"
                 data-theme-accent
               >
                 Q
@@ -104,9 +95,9 @@ export default function AdminLayout({
               title="Toggle Dark Mode"
             >
               {colorScheme === "dark" ? (
-                <IconSun size="1.1rem" />
+                <IconSun size="1.1rem" suppressHydrationWarning />
               ) : (
-                <IconMoon size="1.1rem" />
+                <IconMoon size="1.1rem" suppressHydrationWarning />
               )}
             </ActionIcon>
           </Group>

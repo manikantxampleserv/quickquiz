@@ -21,6 +21,7 @@ model User {
   createdQuizzes Quiz[]
   quizAttempts   QuizAttempt[]
   createdQuestions Question[]
+  activityLogs   ActivityLog[]
 
   @@map("users")
 }
@@ -142,4 +143,31 @@ enum AttemptStatus {
   IN_PROGRESS
   COMPLETED
   ABANDONED
+}
+
+model ActivityLog {
+  id        String      @id @default(cuid())
+  type      ActivityType
+  title     String
+  metadata  String?     // JSON string for additional data
+  createdAt DateTime    @default(now())
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("activity_logs")
+}
+
+enum ActivityType {
+  QUIZ_CREATED
+  QUIZ_DELETED
+  QUIZ_UPDATED
+  QUESTION_CREATED
+  QUESTION_DELETED
+  QUESTION_UPDATED
+  QUIZ_ATTEMPTED
+  USER_REGISTERED
+  USER_UPDATED
+  USER_DELETED
 }

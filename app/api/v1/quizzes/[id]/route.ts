@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ActivityService } from "@/lib/services/activity";
+import { ActivityType } from "@/lib/generated/prisma";
 
 export async function GET(
   request: NextRequest,
@@ -75,14 +77,16 @@ export async function PUT(
       );
     }
 
+    const updateData = {
+      title,
+      description: description || "",
+      timeLimit: timeLimit || 30,
+      isPublic: isPublic !== false,
+    };
+
     const updatedQuiz = await prisma.quiz.update({
       where: { id: quizId },
-      data: {
-        title,
-        description: description || "",
-        timeLimit: timeLimit || 30,
-        isPublic: isPublic !== false,
-      },
+      data: updateData,
       include: {
         createdBy: true,
         _count: {
@@ -93,6 +97,14 @@ export async function PUT(
         },
       },
     });
+
+    // Log quiz update activity
+    await ActivityService.logActivity(
+      updatedQuiz.createdById,
+      ActivityType.QUIZ_UPDATED,
+      `Quiz updated: ${updatedQuiz.title}`,
+      { quizId: updatedQuiz.id }
+    );
 
     return NextResponse.json({
       success: true,
@@ -126,9 +138,20 @@ export async function DELETE(
 
     const { id: quizId } = await params;
 
-    await prisma.quiz.delete({
+    const deletedQuiz = await prisma.quiz.delete({
       where: { id: quizId },
+      include: {
+        createdBy: true,
+      },
     });
+
+    // Log quiz deletion activity
+    await ActivityService.logActivity(
+      deletedQuiz.createdById,
+      ActivityType.QUIZ_DELETED,
+      `Quiz deleted: ${deletedQuiz.title}`,
+      { quizId: deletedQuiz.id }
+    );
 
     return NextResponse.json({
       success: true,

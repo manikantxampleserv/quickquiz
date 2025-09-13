@@ -36,7 +36,6 @@ export async function analyzeRequest(
     }
   `;
 
-  // Retry logic for API overload
   const maxRetries = 2;
   let lastError: any;
 
@@ -45,7 +44,6 @@ export async function analyzeRequest(
       const result = await geminiModel.generateContent(prompt);
       const response = result.response.text();
 
-      // Clean the response to extract JSON from markdown formatting
       const cleanedResponse = response
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
@@ -55,7 +53,6 @@ export async function analyzeRequest(
     } catch (error: any) {
       lastError = error;
 
-      // Check if it's a 503 overload error
       if (
         error.message?.includes("503") ||
         error.message?.includes("overloaded")
@@ -64,7 +61,6 @@ export async function analyzeRequest(
           `Gemini API overloaded (attempt ${attempt}/${maxRetries}), retrying...`
         );
 
-        // Wait before retry (exponential backoff)
         if (attempt < maxRetries) {
           await new Promise((resolve) =>
             setTimeout(resolve, Math.pow(2, attempt) * 1000)
@@ -73,7 +69,6 @@ export async function analyzeRequest(
         }
       }
 
-      // For other errors, break immediately
       break;
     }
   }
@@ -83,7 +78,6 @@ export async function analyzeRequest(
     lastError
   );
 
-  // Return a safe fallback response when AI is unavailable
   return {
     shouldAllow: true,
     action: "allow" as const,

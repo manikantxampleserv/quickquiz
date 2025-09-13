@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Skeleton, Stack, Group, SimpleGrid } from "@mantine/core";
+import { Card, Skeleton, Stack, Group, SimpleGrid, Box } from "@mantine/core";
 
 export function StatCardSkeleton() {
   return (
@@ -56,10 +56,18 @@ export function QuizCardSkeleton() {
 export function TableRowSkeleton() {
   return (
     <tr>
-      <td><Skeleton height={12} width="80%" /></td>
-      <td><Skeleton height={12} width="90%" /></td>
-      <td><Skeleton height={20} width={60} radius="xl" /></td>
-      <td><Skeleton height={12} width="70%" /></td>
+      <td>
+        <Skeleton height={12} width="80%" />
+      </td>
+      <td>
+        <Skeleton height={12} width="90%" />
+      </td>
+      <td>
+        <Skeleton height={20} width={60} radius="xl" />
+      </td>
+      <td>
+        <Skeleton height={12} width="70%" />
+      </td>
       <td>
         <Group gap="xs">
           <Skeleton height={28} width={28} radius="sm" />
@@ -79,16 +87,34 @@ export function ActivityItemSkeleton() {
   );
 }
 
+export function ChartSkeleton({ height = 250 }: { height?: number }) {
+  return (
+    <Card withBorder>
+      <Stack gap="md">
+        <Skeleton height={20} width="150px" />
+        <Skeleton height={height} radius="md" />
+      </Stack>
+    </Card>
+  );
+}
+
 export function DashboardSkeleton() {
   return (
     <Stack gap="lg">
       <Skeleton height={32} width="200px" />
-      
+
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
         {Array.from({ length: 4 }).map((_, index) => (
           <StatCardSkeleton key={index} />
         ))}
       </SimpleGrid>
+
+      <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
+        <ChartSkeleton height={250} />
+        <ChartSkeleton height={250} />
+      </SimpleGrid>
+
+      <ChartSkeleton height={200} />
 
       <Group grow align="flex-start">
         <Card withBorder>
@@ -101,7 +127,7 @@ export function DashboardSkeleton() {
             </Stack>
           </Stack>
         </Card>
-        
+
         <Card withBorder>
           <Stack gap="md">
             <Skeleton height={20} width="120px" />
@@ -140,10 +166,64 @@ export function QuizzesGridSkeleton() {
   );
 }
 
+export function AnalyticsSkeleton() {
+  return (
+    <Stack gap="lg">
+      <Skeleton height={32} width="200px" />
+
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <StatCardSkeleton key={index} />
+        ))}
+      </SimpleGrid>
+
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+        <Card withBorder>
+          <Stack gap="md">
+            <Skeleton height={20} width="200px" />
+            <Skeleton height={200} radius="md" />
+            <Group justify="center" gap="md" mt="sm">
+              <Group gap={4}>
+                <Skeleton height={12} width={12} radius={2} />
+                <Skeleton height={12} width={30} />
+              </Group>
+              <Group gap={4}>
+                <Skeleton height={12} width={12} radius={2} />
+                <Skeleton height={12} width={50} />
+              </Group>
+              <Group gap={4}>
+                <Skeleton height={12} width={12} radius={2} />
+                <Skeleton height={12} width={35} />
+              </Group>
+            </Group>
+          </Stack>
+        </Card>
+
+        <Card withBorder>
+          <Stack gap="md">
+            <Skeleton height={20} width="150px" />
+            <Stack gap="md">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Box key={index}>
+                  <Group justify="space-between" mb={4}>
+                    <Skeleton height={12} width="120px" />
+                    <Skeleton height={12} width="40px" />
+                  </Group>
+                  <Skeleton height={8} width="100%" />
+                </Box>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      </SimpleGrid>
+    </Stack>
+  );
+}
+
 export function UsersTableSkeleton() {
   return (
     <Card withBorder>
-      <table style={{ width: '100%' }}>
+      <table style={{ width: "100%" }}>
         <thead>
           <tr>
             <th>Name</th>

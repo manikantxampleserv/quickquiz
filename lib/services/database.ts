@@ -81,6 +81,17 @@ export const questionService = {
             quizQuestions: true,
           },
         },
+        quizQuestions: {
+          include: {
+            quiz: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+          },
+          orderBy: { order: "asc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -286,8 +297,22 @@ export const analyticsService = {
     const recentQuizzes = await prisma.quiz.findMany({
       take: 5,
       orderBy: { createdAt: "desc" },
-      include: {
-        createdBy: true,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        timeLimit: true,
+        isPublic: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         _count: {
           select: {
             quizQuestions: true,
@@ -296,12 +321,17 @@ export const analyticsService = {
       },
     });
 
+    // Format the response to ensure proper serialization
     return {
       totalUsers,
       totalQuizzes,
       totalQuestions,
       totalAttempts,
-      recentQuizzes,
+      recentQuizzes: recentQuizzes.map((quiz) => ({
+        ...quiz,
+        createdAt: quiz.createdAt.toISOString(),
+        updatedAt: quiz.updatedAt?.toISOString() || null,
+      })),
     };
   },
 

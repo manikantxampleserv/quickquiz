@@ -1,37 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
 import {
-  Container,
-  Title,
-  Card,
-  Text,
+  ActionIcon,
+  Anchor,
   Badge,
-  Stack,
-  Group,
+  Breadcrumbs,
   Button,
+  Card,
+  Center,
+  Divider,
+  Group,
+  Loader,
   Modal,
+  Pagination,
+  Select,
+  Stack,
+  Text,
   TextInput,
   Textarea,
-  Select,
-  ActionIcon,
-  Pagination,
-  Loader,
-  Center,
-  Breadcrumbs,
-  Anchor,
-  Divider,
+  Title,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
-import {
-  IconPlus,
-  IconEdit,
-  IconTrash,
-  IconArrowLeft,
-  IconQuestionMark,
-} from "@tabler/icons-react";
+import { IconArrowLeft, IconPlus, IconQuestionMark, IconTrash } from "@tabler/icons-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface Question {
   id?: string;
@@ -85,7 +78,7 @@ export default function QuizDetailsPage() {
     try {
       const response = await fetch(`/api/quizzes/${quizId}`);
       const data = await response.json();
-      
+
       if (data.success) {
         setQuiz(data.quiz);
       } else {
@@ -112,7 +105,7 @@ export default function QuizDetailsPage() {
         `/api/quizzes/${quizId}/questions?page=${page}&limit=${pageSize}`
       );
       const data = await response.json();
-      
+
       if (data.success) {
         setQuestions(data.questions);
         setTotalPages(data.totalPages || 1);
@@ -139,7 +132,7 @@ export default function QuizDetailsPage() {
   const handleCreateQuestion = async (values: any) => {
     const questionData = {
       ...values,
-      correctAnswer: parseInt(values.correctAnswer)
+      correctAnswer: parseInt(values.correctAnswer),
     };
     try {
       const response = await fetch(`/api/quizzes/${quizId}/questions`, {
@@ -222,35 +215,27 @@ export default function QuizDetailsPage() {
 
   if (loading) {
     return (
-      <Container size="xl" py="xl">
+      <Stack>
         <Center>
           <Loader size="lg" />
         </Center>
-      </Container>
+      </Stack>
     );
   }
 
   if (!quiz) {
     return (
-      <Container size="xl" py="xl">
+      <Stack>
         <Center>
           <Text>Quiz not found</Text>
         </Center>
-      </Container>
+      </Stack>
     );
   }
 
   return (
-    <Container size="xl" py="xl">
+    <>
       <Stack gap="lg">
-        {/* Breadcrumbs */}
-        <Breadcrumbs>
-          <Anchor onClick={() => router.push("/admin/quizzes")}>
-            Quiz Management
-          </Anchor>
-          <Text>{quiz.title}</Text>
-        </Breadcrumbs>
-
         {/* Quiz Header */}
         <Card withBorder>
           <Stack gap="md">
@@ -274,10 +259,7 @@ export default function QuizDetailsPage() {
               <Badge data-theme-accent size="lg">
                 {quiz.timeLimit} minutes
               </Badge>
-              <Badge
-                color={quiz.isPublic ? "green" : "orange"}
-                size="lg"
-              >
+              <Badge color={quiz.isPublic ? "green" : "orange"} size="lg">
                 {quiz.isPublic ? "Public" : "Private"}
               </Badge>
               <Badge variant="light" size="lg">
@@ -403,7 +385,9 @@ export default function QuizDetailsPage() {
               required
             />
 
-            <Text size="sm" fw={500}>Options</Text>
+            <Text size="sm" fw={500}>
+              Options
+            </Text>
             {questionForm.values.options.map((option: string, index: number) => (
               <TextInput
                 key={index}
@@ -443,19 +427,14 @@ export default function QuizDetailsPage() {
             />
 
             <Group justify="flex-end">
-              <Button
-                variant="subtle"
-                onClick={() => setQuestionModalOpened(false)}
-              >
+              <Button variant="subtle" onClick={() => setQuestionModalOpened(false)}>
                 Cancel
               </Button>
-              <Button type="submit">
-                Add Question
-              </Button>
+              <Button type="submit">Add Question</Button>
             </Group>
           </Stack>
         </form>
       </Modal>
-    </Container>
+    </>
   );
 }

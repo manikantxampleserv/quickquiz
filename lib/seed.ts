@@ -1,8 +1,9 @@
 import { prisma } from "./prisma";
+import { ActivityService } from "./services/activity";
+import { ActivityType } from "./generated/prisma";
 
 export async function seedDatabase() {
   try {
-    // Create default admin user
     const adminUser = await prisma.user.upsert({
       where: { email: "admin@quickquiz.com" },
       update: {},
@@ -13,7 +14,30 @@ export async function seedDatabase() {
       },
     });
 
-    // Create sample quizzes
+    await ActivityService.logActivity(
+      adminUser.id,
+      ActivityType.USER_REGISTERED,
+      `Admin user created: ${adminUser.email}`,
+      { role: adminUser.role }
+    );
+
+    const testUser = await prisma.user.upsert({
+      where: { email: "test@quickquiz.com" },
+      update: {},
+      create: {
+        email: "test@quickquiz.com",
+        name: "Test User",
+        role: "USER",
+      },
+    });
+
+    await ActivityService.logActivity(
+      testUser.id,
+      ActivityType.USER_REGISTERED,
+      `Test user registered: ${testUser.email}`,
+      { role: testUser.role }
+    );
+
     let aptitudeQuiz = await prisma.quiz.findFirst({
       where: { title: "Aptitude and Reasoning" },
     });
@@ -28,6 +52,13 @@ export async function seedDatabase() {
           createdById: adminUser.id,
         },
       });
+
+      await ActivityService.logActivity(
+        adminUser.id,
+        ActivityType.QUIZ_CREATED,
+        `Created quiz: ${aptitudeQuiz.title}`,
+        { quizId: aptitudeQuiz.id }
+      );
     }
 
     let jsQuiz = await prisma.quiz.findFirst({
@@ -43,6 +74,13 @@ export async function seedDatabase() {
           createdById: adminUser.id,
         },
       });
+
+      await ActivityService.logActivity(
+        adminUser.id,
+        ActivityType.QUIZ_CREATED,
+        `Created quiz: ${jsQuiz.title}`,
+        { quizId: jsQuiz.id }
+      );
     }
 
     let reactQuiz = await prisma.quiz.findFirst({
@@ -58,7 +96,36 @@ export async function seedDatabase() {
           createdById: adminUser.id,
         },
       });
+
+      await ActivityService.logActivity(
+        adminUser.id,
+        ActivityType.QUIZ_CREATED,
+        `Created quiz: ${reactQuiz.title}`,
+        { quizId: reactQuiz.id }
+      );
     }
+
+    // Helper function to create a question and log the activity
+    const createQuestion = async (questionData: any) => {
+      const question = await prisma.question.create({
+        data: questionData,
+      });
+
+      await ActivityService.logActivity(
+        questionData.createdById,
+        ActivityType.QUESTION_CREATED,
+        `Created question: ${question.question.substring(0, 50)}${
+          question.question.length > 50 ? "..." : ""
+        }`,
+        {
+          questionId: question.id,
+          difficulty: questionData.difficulty,
+          quizId: questionData.quizId,
+        }
+      );
+
+      return question;
+    };
 
     // Create sample questions
     const questions = [
@@ -175,6 +242,7 @@ export async function seedDatabase() {
     ];
 
     // Create questions and link them to quizzes
+    const createdQuestions = [];
     for (let i = 0; i < questions.length; i++) {
       const questionData = questions[i];
       const existing = await prisma.question.findFirst({
@@ -184,56 +252,82 @@ export async function seedDatabase() {
       });
 
       if (!existing) {
-        const newQuestion = await prisma.question.create({
-          data: questionData,
+        const newQuestion = await createQuestion(questionData);
+        createdQuestions.push(newQuestion);
+      }
+    }
+
+    // Create quiz-question relationships and log activities
+    for (const question of createdQuestions) {
+      // Link questions to appropriate quizzes based on question content
+      let targetQuiz;
+      if (
+        question.question.includes("√") ||
+        question.question.includes("HCF") ||
+        question.question.includes("%")
+      ) {
+        targetQuiz = aptitudeQuiz;
+      } else if (
+        question.question.includes("JavaScript") ||
+        question.question.includes("var") ||
+        question.question.includes("typeof")
+      ) {
+        targetQuiz = jsQuiz;
+      } else if (
+        question.question.includes("React") ||
+        question.question.includes("JSX") ||
+        question.question.includes("useState")
+      ) {
+        targetQuiz = reactQuiz;
+      } else {
+        targetQuiz = aptitudeQuiz; // Default to aptitude quiz
+      }
+
+      if (targetQuiz) {
+        // Check if quiz-question link already exists
+        const existingLink = await prisma.quizQuestion.findFirst({
+          where: {
+            quizId: targetQuiz.id,
+            questionId: question.id,
+          },
         });
 
-        // Link questions to appropriate quizzes based on question content
-        let targetQuiz;
-        if (
-          questionData.question.includes("√") ||
-          questionData.question.includes("HCF") ||
-          questionData.question.includes("%")
-        ) {
-          targetQuiz = aptitudeQuiz;
-        } else if (
-          questionData.question.includes("JavaScript") ||
-          questionData.question.includes("var") ||
-          questionData.question.includes("typeof")
-        ) {
-          targetQuiz = jsQuiz;
-        } else if (
-          questionData.question.includes("React") ||
-          questionData.question.includes("JSX") ||
-          questionData.question.includes("useState")
-        ) {
-          targetQuiz = reactQuiz;
-        } else {
-          targetQuiz = aptitudeQuiz; // Default to aptitude quiz
-        }
-
-        if (targetQuiz) {
-          // Check if quiz-question link already exists
-          const existingLink = await prisma.quizQuestion.findFirst({
-            where: {
+        if (!existingLink) {
+          await prisma.quizQuestion.create({
+            data: {
               quizId: targetQuiz.id,
-              questionId: newQuestion.id,
+              questionId: question.id,
+              order: createdQuestions.indexOf(question) + 1,
+              points: 1,
             },
           });
-
-          if (!existingLink) {
-            await prisma.quizQuestion.create({
-              data: {
-                quizId: targetQuiz.id,
-                questionId: newQuestion.id,
-                order: i + 1,
-                points: 1,
-              },
-            });
-          }
         }
       }
     }
+
+    // Create a quiz attempt
+    const attempt = await prisma.quizAttempt.create({
+      data: {
+        userId: testUser.id,
+        quizId: aptitudeQuiz.id,
+        score: 2,
+        totalPoints: 3,
+        timeSpent: 1200, // 20 minutes in seconds
+        status: "COMPLETED",
+      },
+    });
+
+    await ActivityService.logActivity(
+      testUser.id,
+      ActivityType.QUIZ_ATTEMPTED,
+      `Completed quiz: ${aptitudeQuiz.title}`,
+      {
+        quizId: aptitudeQuiz.id,
+        score: 2,
+        totalPoints: 3,
+        percentage: Math.round((2 / 3) * 100),
+      }
+    );
 
     console.log("Database seeded successfully!");
     return { success: true, message: "Database seeded successfully!" };

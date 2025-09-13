@@ -11,7 +11,6 @@ import {
   Text,
   Title,
   useMantineColorScheme,
-  useMantineTheme,
 } from "@mantine/core";
 import { IconPalette } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
@@ -34,7 +33,6 @@ const themeColors = [
 
 export default function ThemeSidebar({ opened, onClose }: ThemeSidebarProps) {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
-  const theme = useMantineTheme();
   const [selectedColor, setSelectedColor] = useState("blue");
 
   // Load saved theme color on component mount
